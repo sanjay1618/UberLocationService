@@ -2,7 +2,10 @@ package com.example.uberlocationservice.controllers;
 
 
 import com.example.uberlocationservice.dtos.NearByDriversRequestDTO;
+import com.example.uberlocationservice.dtos.NearByDriversResponseDTO;
 import com.example.uberlocationservice.dtos.SaveDriverLocationRequestDTO;
+import com.example.uberlocationservice.services.LocationService;
+import com.example.uberlocationservice.services.LocationServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.geo.*;
 import org.springframework.data.mongodb.repository.Near;
@@ -26,49 +29,34 @@ public class LocationController {
     private static final Double RADIUS_TO_SEARCH= 5.0;
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final LocationServiceImpl locationService;
 
     @Autowired
-    public LocationController(StringRedisTemplate stringRedisTemplate) {
+    public LocationController(StringRedisTemplate stringRedisTemplate, LocationServiceImpl locationService) {
         this.stringRedisTemplate = stringRedisTemplate;
+        this.locationService = locationService;
     }
 
 
     @PostMapping("/drivers")
     public ResponseEntity<Boolean> saveDriverLocation(@RequestBody SaveDriverLocationRequestDTO saveDriverLocationRequestDTO){
-        try{
-            GeoOperations<String, String> geoOPs = stringRedisTemplate.opsForGeo();
-            Long location = geoOPs.add(DRIVER_OPS_KEY,
-                    new RedisGeoCommands.GeoLocation<String>(saveDriverLocationRequestDTO.getDriverId(),
-                            new Point(saveDriverLocationRequestDTO.getLongitude(), saveDriverLocationRequestDTO.getLatitude())));
-          System.out.println(location);
-            return new ResponseEntity<>(true, HttpStatus.CREATED);
+        Boolean isDriverLocationSaved =  locationService.saveDriverLocation(saveDriverLocationRequestDTO.getLongitude(), saveDriverLocationRequestDTO.getLatitude(), saveDriverLocationRequestDTO.getDriverId());
+        if (isDriverLocationSaved){
+            return new ResponseEntity<>(true, HttpStatus.OK);
         }
-        catch(Exception e){
-            e.printStackTrace();
-            return new ResponseEntity<>(false,HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return new ResponseEntity<>(false, HttpStatus.BAD_REQUEST);
     }
 
+
     @GetMapping("/nearbyDrivers")
-    public ResponseEntity<List<String>> getNearByDrivers(@RequestBody NearByDriversRequestDTO nearByDriversRequestDTO) {
-      try {
-          GeoOperations<String, String> geoOPs = stringRedisTemplate.opsForGeo();
-          Distance distanceWithMetrics = new Distance(RADIUS_TO_SEARCH, Metrics.KILOMETERS);
-          Circle withIn = new Circle(new Point(nearByDriversRequestDTO.getLongitude(), nearByDriversRequestDTO.getLatitude()), distanceWithMetrics);
-          GeoResults<RedisGeoCommands.GeoLocation<String>> results = geoOPs.radius(DRIVER_OPS_KEY, withIn, RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs().includeCoordinates().includeDistance()
-          );
+    public ResponseEntity<List<NearByDriversResponseDTO>> getNearByDrivers(@RequestBody NearByDriversRequestDTO nearByDriversRequestDTO) {
+        List<NearByDriversResponseDTO> nearByDriversResponseDTOList = locationService.findNearByDrivers(nearByDriversRequestDTO.getLongitude(), nearByDriversRequestDTO.getLatitude(), 5.0);
+        if (nearByDriversResponseDTOList.isEmpty()){
+            return new ResponseEntity<>(null,HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<>(nearByDriversResponseDTOList, HttpStatus.OK);
 
-          List<String> nearByDrivers = new ArrayList<>();
-          for (GeoResult<RedisGeoCommands.GeoLocation<String>> geoResult : results) {
-              nearByDrivers.add(geoResult.getContent().toString());
-              System.out.println(geoResult.toString());
-          }
 
-          return new ResponseEntity<List<String>>(nearByDrivers, HttpStatus.OK);
-
-      } catch (Exception e) {
-          return new ResponseEntity<>(new ArrayList<>(), HttpStatus.INTERNAL_SERVER_ERROR);
-      }
 
     }
 

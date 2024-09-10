@@ -5,12 +5,17 @@ import lombok.*;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class NearByDriversRequestDTO {
+
+public class NearByDriversResponseDTO {
+
+    private String driverId;
+
+    private Double longitude;
 
     private Double latitude;
 
-    private Double longitude;
+
 }

@@ -10,9 +10,8 @@ import lombok.*;
 public class SaveDriverLocationRequestDTO {
     private String driverId;
 
-
-
     private Double longitude;
+
     private Double latitude;
 
 }
